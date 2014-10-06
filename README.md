@@ -1,4 +1,4 @@
 Kamstrup602
 ===========
 
-Reading Kamstrup 602 from Arduino Uno using the Kamstrup Metering Protocol (KMP).
+Using an Arduino Uno to read parameters of a Kamstrup 602 by using the Kamstrup Metering Protocol (KMP).
