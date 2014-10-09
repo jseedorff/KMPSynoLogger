@@ -121,7 +121,7 @@ void loop () {
       client.print("&value=");
       client.print(fValue);
       client.print("&id=");
-      client.println(gkreg+1);
+      client.println(gkreg+500); // Avoid that ID collides with Z-Wave devices
       // client.println(" HTTP/1.1");
       // client.println("Host: 192.168.10.26");
       // client.println("User-Agent: arduino-ethernet");
@@ -136,8 +136,8 @@ void loop () {
       Serial.print("&value=");
       Serial.print(fValue);
       Serial.print("&id=");
-      Serial.println(gkreg+1);
-
+      Serial.println(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      
       Serial.println("Done sending data");
       
       // Note the time that the connection was made
