@@ -3,12 +3,12 @@
 #include <SoftwareSerial.h>                    // Using a modified version of SoftwareSerial where the transmitter is inverted
 
 // Wifi
-char ssid[] = "xxxxx";                         // Network SSID (name) 
-char pass[] = "xxxxx";                         // Network password
+char ssid[] = "Test";                          // Network SSID (name) 
+char pass[] = "Pwd1234!";                      // Network password
 int status = WL_IDLE_STATUS;                   // Status of the Wifi radio
 unsigned long lastConnectionTime = 0;          // Last time a connection was made to the server, in milliseconds
 boolean lastConnected = false;                 // Dtate of the connection last time through the main loop
-const unsigned long postingInterval = 3*1000;  // Delay between updates, in milliseconds
+const unsigned long postingInterval = 1000;    // Delay between updates, in milliseconds
 IPAddress server(192,168,10,26);               // IP address of the Synology server
 WiFiClient client;
 
@@ -149,6 +149,8 @@ void loop () {
       // Only read temperatures
       if (gkreg > NUMREGS-1) {
         gkreg = 1;
+        // Wait 5 minutes between each series of readings
+        delay(300000);
       }
     }
     else {
