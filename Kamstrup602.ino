@@ -3,6 +3,7 @@
 #include <SoftwareSerial.h>                    // Using a modified version of SoftwareSerial where the transmitter is inverted
 
 // Wifi
+//
 char ssid[] = "Test";                          // Network SSID (name) 
 char pass[] = "Pwd1234!";                      // Network password
 int status = WL_IDLE_STATUS;                   // Status of the Wifi radio
