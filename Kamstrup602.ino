@@ -1,9 +1,10 @@
 #include <SPI.h>
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <SoftwareSerial.h>                    // Using a modified version of SoftwareSerial where the transmitter is inverted
+#include <Time.h> 
 
 // Wifi
-//
 char ssid[] = "Test";                          // Network SSID (name) 
 char pass[] = "Pwd1234!";                      // Network password
 int status = WL_IDLE_STATUS;                   // Status of the Wifi radio
@@ -13,6 +14,18 @@ const unsigned long postingInterval = 1000;    // Delay between updates, in mill
 IPAddress server(192,168,10,26);               // IP address of the Synology server
 WiFiClient client;
 
+// NTP Servers:
+IPAddress timeServer(129, 6, 15, 28); // timeserver
+
+const int timeZone = 2;     // Central European Time
+//const int timeZone = -5;  // Eastern Standard Time (USA)
+//const int timeZone = -4;  // Eastern Daylight Time (USA)
+//const int timeZone = -8;  // Pacific Standard Time (USA)
+//const int timeZone = -7;  // Pacific Daylight Time (USA)
+
+WiFiUDP Udp;
+unsigned int localPort = 2390;  // local port to listen for UDP packets
+
 // Kamstrup Multical 602
 word const kregnums[] = { 0x003C,0x0050,0x0056,0x0057,0x0059,0x004a,0x0044,0x0045 };
 char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Flow","Vol_1","Vol_2" };
@@ -21,6 +34,7 @@ char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Fl
 
 // Database
 int gkreg = 1;
+time_t t;
 
 // Sorting of the registers accoring to type (power, temperature, flow, volume etc.
 char* kdbtype[] = { "FV_Energy","FV_Power","FV_Temp","FV_Temp","FV_Temp","FV_Flow","FV_Vol","FV_Vol" };
@@ -79,6 +93,11 @@ void setup () {
     Serial.println("Connection to network established");
     printWifiStatus();
   }
+  
+  // Sync time to NTP server
+  Udp.begin(localPort);
+  Serial.println("waiting for sync");
+  setSyncProvider(getNtpTime);
 }
 
 /******************************/
@@ -87,8 +106,13 @@ void setup () {
 /**                          **/
 /******************************/
 void loop () {
-
   float fValue = 0;  // The value of the last read register
+  int digits;
+  
+  // If we are about to read the first register, then register the time
+  if (gkreg == 1) {
+    t = now();    
+  }
   
   // Flush and stop to prevent socket issues
   client.flush();
@@ -115,14 +139,40 @@ void loop () {
       Serial.println("Send data to server");
 
       // Write register to server using HTTP PUT
-      client.print("PUT /data_post.php?type=");
+      client.print("PUT /data_post1.php?type=");
       client.print(kdbtype[gkreg]);
       client.print("&name=");
       client.print(kregstrings[gkreg]);
       client.print("&value=");
       client.print(fValue);
       client.print("&id=");
-      client.println(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      client.print(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      client.print("&time=");
+      client.print(year(t)); 
+      client.print("-");
+      client.print(month(t));
+      client.print("-");
+      client.print(day(t));
+      client.print("-");
+      digits = hour(t);
+      if (digits < 10) {
+        client.print("0"); 
+      }
+      client.print(digits);
+      client.print(":");
+      digits = minute(t);
+      if (digits < 10) {
+        client.print("0"); 
+      }
+      client.print(digits);
+      client.print(":");
+      digits = second(t);
+      if (digits < 10) {
+        client.print("0");
+      }
+      client.print(digits);
+      client.println(); 
+      
       // client.println(" HTTP/1.1");
       // client.println("Host: 192.168.10.26");
       // client.println("User-Agent: arduino-ethernet");
@@ -137,7 +187,32 @@ void loop () {
       Serial.print("&value=");
       Serial.print(fValue);
       Serial.print("&id=");
-      Serial.println(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      Serial.print(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      Serial.print("&time=");
+      Serial.print(year(t)); 
+      Serial.print("-");
+      Serial.print(month(t));
+      Serial.print("-");
+      Serial.print(day(t));
+      Serial.print("-");
+      digits = hour(t);
+      if (digits < 10) {
+        Serial.print("0"); 
+      }
+      Serial.print(digits);
+      Serial.print(":");
+      digits = minute(t);
+      if (digits < 10) {
+        Serial.print("0"); 
+      }
+      Serial.print(digits);
+      Serial.print(":");
+      digits = second(t);
+      if (digits < 10) {
+        Serial.print("0");
+      }
+      Serial.print(digits);
+      Serial.println(); 
       
       Serial.println("Done sending data");
       
@@ -159,34 +234,11 @@ void loop () {
       Serial.println("Connection failed");
     }
   }
- 
   // Store the state of the connection for next time through the loop
   lastConnected = client.connected();
  
   // Flash the LED pin - just for debug
   digitalWrite(PIN_LED, digitalRead(PIN_KAMSER_RX));
-}
-
-/******************************/
-/**                          **/
-/**     printWifiStatus      **/
-/**                          **/
-/******************************/
-void printWifiStatus() {
-   // Print the SSID of the network
-   Serial.print("SSID: ");
-   Serial.println(WiFi.SSID());
-
-   // Print the WiFi shield's IP address
-   IPAddress ip = WiFi.localIP();
-   Serial.print("IP Address: ");
-   Serial.println(ip);
-
-   // Print the received signal strength
-   long rssi = WiFi.RSSI();
-   Serial.print("signal strength (RSSI):");
-   Serial.print(rssi);
-   Serial.println(" dBm");
 }
 
 /******************************/
@@ -389,4 +441,87 @@ long crc_1021(byte const *inmsg, unsigned int len){
     }
   }
   return creg;
+}
+
+/******************************/
+/**                          **/
+/**     printWifiStatus      **/
+/**                          **/
+/******************************/
+void printWifiStatus() {
+   // Print the SSID of the network
+   Serial.print("SSID: ");
+   Serial.println(WiFi.SSID());
+
+   // Print the WiFi shield's IP address
+   IPAddress ip = WiFi.localIP();
+   Serial.print("IP Address: ");
+   Serial.println(ip);
+
+   // Print the received signal strength
+   long rssi = WiFi.RSSI();
+   Serial.print("signal strength (RSSI):");
+   Serial.print(rssi);
+   Serial.println(" dBm");
+}
+
+/*-------- NTP code ----------*/
+
+const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+
+/******************************/
+/**                          **/
+/**       getNtpTime()       **/
+/**                          **/
+/******************************/
+time_t getNtpTime()
+{
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  Serial.println("Transmit NTP Request");
+  sendNTPpacket(timeServer);
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.println("Receive NTP Response");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
+
+/******************************/
+/**                          **/
+/**      sendNTPpacket       **/
+/**                          **/
+/******************************/
+void sendNTPpacket(IPAddress &address)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:                 
+  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  Udp.endPacket();
 }
