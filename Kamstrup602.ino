@@ -172,12 +172,6 @@ void loop () {
       }
       client.print(digits);
       client.println(); 
-      
-      // client.println(" HTTP/1.1");
-      // client.println("Host: 192.168.10.26");
-      // client.println("User-Agent: arduino-ethernet");
-      // client.println("Connection: close");
-      // client.println();
 
       // Serial output - just for debug
       Serial.print("GET /data_post.php?type=");
