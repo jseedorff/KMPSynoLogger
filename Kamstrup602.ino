@@ -34,6 +34,7 @@ char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Fl
 
 // Database
 int gkreg = 1;
+float fValue[NUMREGS];  // Array to hold the register values
 time_t t;
 
 // Sorting of the registers accoring to type (power, temperature, flow, volume etc.
@@ -110,7 +111,6 @@ void setup () {
 /**                          **/
 /******************************/
 void loop () {
-  float fValue[NUMREGS];  // Array to hold the register values
   int digits;
   
   // At the beginning of the upload cycle to the database server
