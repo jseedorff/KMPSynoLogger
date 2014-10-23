@@ -27,9 +27,9 @@ WiFiUDP Udp;
 unsigned int localPort = 2390;  // local port to listen for UDP packets
 
 // Kamstrup Multical 602
-word const kregnums[] = { 0x003C,0x0050,0x0056,0x0057,0x0059,0x004a,0x0044,0x0045 };
-char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Flow","Vol_1","Vol_2" };
-#define NUMREGS 8                              // Number of registers that are to be read from the Kamstrup
+word const kregnums[] = { 0x003C,0x0050,0x0056,0x0057,0x0059,0x004a,0x004b,0x0044,0x0045 };
+char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Flow_1","Flow_2","Vol_1","Vol_2" };
+#define NUMREGS 9                              // Number of registers that are to be read from the Kamstrup
 #define KAMBAUD 1200                           // Baud rate of the Kamstrup KMP Data connection
 
 // Database
@@ -37,7 +37,7 @@ int gkreg = 1;
 time_t t;
 
 // Sorting of the registers accoring to type (power, temperature, flow, volume etc.
-char* kdbtype[] = { "FV_Energy","FV_Power","FV_Temp","FV_Temp","FV_Temp","FV_Flow","FV_Vol","FV_Vol" };
+char* kdbtype[] = { "FV_Energy","FV_Power","FV_Temp","FV_Temp","FV_Temp","FV_Flow","FV_Flow","FV_Vol","FV_Vol" };
 
 // Units
 char*  units[65] = {"","Wh","kWh","MWh","GWh","j","kj","Mj",
@@ -115,22 +115,29 @@ void loop () {
   }
   
   // Flush and stop to prevent socket issues
-  client.flush();
-  client.stop();  
+  // client.flush();
+  // client.stop();  
 
   // if there's no net connection, but there was one last time through the loop, stop the client
-  if (!client.connected() && lastConnected) {
-     Serial.println("Disconnecting");
-     client.stop();
-  }
+ // if (!client.connected() && lastConnected) { 
+ //    Serial.println("Disconnecting");
+ //    client.stop();
+ // }
   
   // Check if it is time to do a Poll
   if(!client.connected() && (millis() - lastConnectionTime > postingInterval)) {
 
+    client.stop();
+    
     // Poll the Kamstrup register for data 
     Serial.println("");
     Serial.println("Reading Multical 602");
     fValue = kamReadReg(gkreg);
+    
+    // Adjust Vol with offset value
+    if (gkreg == 7) {
+      fValue = fValue - 23.83;
+    }  
     
     // Attempt to connect with the server
     Serial.println("Attempting to connect with server");
@@ -146,7 +153,7 @@ void loop () {
       client.print("&value=");
       client.print(fValue);
       client.print("&id=");
-      client.print(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      client.print(gkreg+300); // Avoid that ID collides with Z-Wave devices
       client.print("&time=");
       client.print(year(t)); 
       client.print("-");
@@ -170,18 +177,21 @@ void loop () {
       if (digits < 10) {
         client.print("0");
       }
-      client.print(digits);
-      client.println(); 
+      client.println(digits);
+      
+      
+      // Note the time that the connection was made
+      lastConnectionTime = millis();
 
       // Serial output - just for debug
-      Serial.print("GET /data_post.php?type=");
+      Serial.print("/data_post1.php?type=");
       Serial.print(kdbtype[gkreg]);
       Serial.print("&name=");
       Serial.print(kregstrings[gkreg]);
       Serial.print("&value=");
       Serial.print(fValue);
       Serial.print("&id=");
-      Serial.print(gkreg+500); // Avoid that ID collides with Z-Wave devices
+      Serial.print(gkreg+300); // Avoid that ID collides with Z-Wave devices
       Serial.print("&time=");
       Serial.print(year(t)); 
       Serial.print("-");
@@ -205,14 +215,10 @@ void loop () {
       if (digits < 10) {
         Serial.print("0");
       }
-      Serial.print(digits);
-      Serial.println(); 
-      
+      Serial.println(digits);
+           
       Serial.println("Done sending data");
-      
-      // Note the time that the connection was made
-      lastConnectionTime = millis();
-      
+     
       // Next register
       gkreg++;
       
@@ -226,10 +232,11 @@ void loop () {
     else {
       // Couldn't make a connection
       Serial.println("Connection failed");
+      client.stop();
     }
   }
   // Store the state of the connection for next time through the loop
-  lastConnected = client.connected();
+  //lastConnected = client.connected();
  
   // Flash the LED pin - just for debug
   digitalWrite(PIN_LED, digitalRead(PIN_KAMSER_RX));
