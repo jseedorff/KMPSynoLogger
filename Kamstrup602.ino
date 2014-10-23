@@ -79,7 +79,8 @@ void setup () {
   delay(1000);
   
   // Attempt to connect using WPA2 encryption:
-  Serial.println("Attempting to connect to WPA network...");
+  Serial.println("Attempting to connect to WPA network");
+  Serial.println("------------------------------------");
   status = WiFi.begin(ssid, pass);
   
   // if not connected, just stop here
@@ -93,11 +94,14 @@ void setup () {
     Serial.println("Connection to network established");
     printWifiStatus();
   }
+  Serial.println("");
   
   // Sync time to NTP server
   Udp.begin(localPort);
-  Serial.println("waiting for sync");
+  Serial.println("Waiting for NTP time sync");
+  Serial.println("-------------------------");
   setSyncProvider(getNtpTime);
+  Serial.println("");
 }
 
 /******************************/
@@ -106,44 +110,51 @@ void setup () {
 /**                          **/
 /******************************/
 void loop () {
-  float fValue = 0;  // The value of the last read register
+  float fValue[NUMREGS];  // Array to hold the register values
   int digits;
   
-  // If we are about to read the first register, then register the time
+  // At the beginning of the upload cycle to the database server
   if (gkreg == 1) {
-    t = now();    
+    
+    // Set the timestamp
+    t = now();
+    
+    // Read Registers from Kamstrup 602
+    Serial.println("Reading data from Multical 602");
+    Serial.println("------------------------------");
+    for (int i = 1; i < NUMREGS; i++) {
+  
+      // Read Kanstrup 602 register
+      fValue[i] = kamReadReg(i);
+
+      // Adjust Vol with offset value
+      if (i == 7) {
+        fValue[i] = fValue[i] - 23.83;
+      }  
+      
+      // For debug only
+      Serial.print(kregstrings[i]);
+      Serial.print("=");
+      Serial.println(fValue[i]);
+      
+      // Short delay before next poll
+      delay(100);
+    }
+    Serial.println("");  
   }
   
-  // Flush and stop to prevent socket issues
-  // client.flush();
-  // client.stop();  
-
-  // if there's no net connection, but there was one last time through the loop, stop the client
- // if (!client.connected() && lastConnected) { 
- //    Serial.println("Disconnecting");
- //    client.stop();
- // }
-  
-  // Check if it is time to do a Poll
+  // Check if it is time to write the next register to the database server
   if(!client.connected() && (millis() - lastConnectionTime > postingInterval)) {
-
+ 
+    // End the connection
     client.stop();
-    
-    // Poll the Kamstrup register for data 
-    Serial.println("");
-    Serial.println("Reading Multical 602");
-    fValue = kamReadReg(gkreg);
-    
-    // Adjust Vol with offset value
-    if (gkreg == 7) {
-      fValue = fValue - 23.83;
-    }  
-    
+ 
     // Attempt to connect with the server
-    Serial.println("Attempting to connect with server");
+    Serial.println("Attempting connection with database server");
+    Serial.println("------------------------------------------");
     if (client.connect(server, 80)) {
       Serial.println("Connected!");
-      Serial.println("Send data to server");
+      Serial.println("Sending data to database server");
 
       // Write register to server using HTTP PUT
       client.print("PUT /data_post1.php?type=");
@@ -151,7 +162,7 @@ void loop () {
       client.print("&name=");
       client.print(kregstrings[gkreg]);
       client.print("&value=");
-      client.print(fValue);
+      client.print(fValue[gkreg]);
       client.print("&id=");
       client.print(gkreg+300); // Avoid that ID collides with Z-Wave devices
       client.print("&time=");
@@ -178,18 +189,17 @@ void loop () {
         client.print("0");
       }
       client.println(digits);
-      
-      
+            
       // Note the time that the connection was made
       lastConnectionTime = millis();
 
       // Serial output - just for debug
-      Serial.print("/data_post1.php?type=");
+      Serial.print("PUT /data_post1.php?type=");
       Serial.print(kdbtype[gkreg]);
       Serial.print("&name=");
       Serial.print(kregstrings[gkreg]);
       Serial.print("&value=");
-      Serial.print(fValue);
+      Serial.print(fValue[gkreg]);
       Serial.print("&id=");
       Serial.print(gkreg+300); // Avoid that ID collides with Z-Wave devices
       Serial.print("&time=");
@@ -217,9 +227,9 @@ void loop () {
       }
       Serial.println(digits);
            
-      Serial.println("Done sending data");
+      Serial.println("Done sending data to database server");
      
-      // Next register
+      // Next register to upload
       gkreg++;
       
       // Only read temperatures
@@ -227,6 +237,7 @@ void loop () {
         gkreg = 1;
         // Wait 5 minutes between each series of readings
         delay(300000);
+        Serial.println("");
       }
     }
     else {
@@ -267,11 +278,11 @@ float kamReadReg(unsigned short kreg) {
     rval = kamDecode(kreg, recvmsg);
     
     // Print out received value to terminal - just for debug
-    Serial.print(kregstrings[kreg]);
-    Serial.print(": ");
-    Serial.print(rval);
-    Serial.print(" ");
-    Serial.println();
+    // Serial.print(kregstrings[kreg]);
+    // Serial.print(": ");
+    // Serial.print(rval);
+    // Serial.print(" ");
+    // Serial.println();
     
     return rval;
   }
