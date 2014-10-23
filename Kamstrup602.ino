@@ -27,20 +27,21 @@ WiFiUDP Udp;
 unsigned int localPort = 2390;  // local port to listen for UDP packets
 
 // Kamstrup Multical 602
-word const kregnums[] = { 0x003C,0x0050,0x0056,0x0057,0x0059,0x004a,0x004b,0x0044,0x0045 };
-char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Flow_1","Flow_2","Vol_1","Vol_2" };
-#define NUMREGS 9                              // Number of registers that are to be read from the Kamstrup
+word const kregnums[] = { 0x003C,0x0050,0x0056,0x0057,0x0059,0x004a,0x004b,0x0044,0x0045,0x0048,0x0049 };
+char* kregstrings[] = { "Energy","Cur_Power","Temp_T1","Temp_T2","Diff_Temp","Flow_1","Flow_2","Vol_1","Vol_2","Mass_1","Mass_2","Leak" };
+#define NUMREGS 11                             // Number of registers that are to be read from the Kamstrup
 #define KAMBAUD 1200                           // Baud rate of the Kamstrup KMP Data connection
 
 // Database
 int gkreg = 1;
-float fValue[NUMREGS];  // Array to hold the register values
+float fValue[12];  // Array to hold the register values
 time_t t;
 
 // Sorting of the registers accoring to type (power, temperature, flow, volume etc.
-char* kdbtype[] = { "FV_Energy","FV_Power","FV_Temp","FV_Temp","FV_Temp","FV_Flow","FV_Flow","FV_Vol","FV_Vol" };
+char* kdbtype[] = { "FV_Energy","FV_Power","FV_Temp","FV_Temp","FV_Temp","FV_Flow","FV_Flow","FV_Vol","FV_Vol","FV_Mass","FV_Mass","FV_leak" };
 
 // Units
+/*
 char*  units[65] = {"","Wh","kWh","MWh","GWh","j","kj","Mj",
 	"Gj","Cal","kCal","Mcal","Gcal","varh","kvarh","Mvarh","Gvarh",
         "VAh","kVAh","MVAh","GVAh","kW","kW","MW","GW","kvar","kvar","Mvar",
@@ -48,6 +49,7 @@ char*  units[65] = {"","Wh","kWh","MWh","GWh","j","kj","Mj",
         "l/h","m3/h","m3xC","ton","ton/h","h","hh:mm:ss","yy:mm:dd","yyyy:mm:dd",
         "mm:dd","","bar","RTC","ASCII","m3 x 10","ton xr 10","GJ x 10","minutes","Bitfield",
         "s","ms","days","RTC-Q","Datetime"};
+*/
 
 // Arduino Uno pin allocations
 #define PIN_KAMSER_RX  5   // Kamstrup Data DAT/62 (Yellow wire)
@@ -131,7 +133,12 @@ void loop () {
       if (i == 7) {
         fValue[i] = fValue[i] - 23.83;
       }  
-      
+
+      // Adjust Vol with offset value
+      if (i == 9) {
+        fValue[i] = fValue[i] - 23.43;
+      }  
+     
       // For debug only
       Serial.print(kregstrings[i]);
       Serial.print("=");
@@ -140,6 +147,9 @@ void loop () {
       // Short delay before next poll
       delay(100);
     }
+    
+    // Calculate mass leak and assign this to register 11
+    fValue[11] = fValue[9] - fValue[10];
     Serial.println("");  
   }
   
@@ -233,7 +243,7 @@ void loop () {
       gkreg++;
       
       // Only read temperatures
-      if (gkreg > NUMREGS-1) {
+      if (gkreg > NUMREGS) {
         gkreg = 1;
         // Wait 5 minutes between each series of readings
         delay(300000);
