@@ -1,7 +1,7 @@
 #include <SPI.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <SoftwareSerial.h>                    // Using a modified version of SoftwareSerial where the transmitter is inverted
+#include <KMPSoftwareSerial.h>                    // Using a modified version of SoftwareSerial where the transmitter is inverted
 #include <Time.h> 
 
 // Wifi
@@ -58,7 +58,7 @@ char*  units[65] = {"","Wh","kWh","MWh","GWh","j","kj","Mj",
 
 // Kamstrup KMP serial
 #define KAMTIMEOUT 300     // Kamstrup timeout after transmit
-SoftwareSerial kamSer(PIN_KAMSER_RX, PIN_KAMSER_TX, true);  // Initialize serial
+KMPSoftwareSerial kamSer(PIN_KAMSER_RX, PIN_KAMSER_TX, true);  // Initialize serial
 
 /******************************/
 /**                          **/
